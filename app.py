@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side
 
@@ -78,7 +79,7 @@ def display_employee_data(df):
     st.dataframe(employee_data)
 
 
-def create_employee_sheets(df, billing_period):
+def create_employee_sheets(df, billing_period, original_file):
     employee_column = '員工編號'
     name_column = '員工姓名'
 
@@ -86,110 +87,116 @@ def create_employee_sheets(df, billing_period):
         st.error(f"找不到 '{employee_column}' 或 '{name_column}' 列。請確保數據中包含這些列。")
         return None
 
+    # 加載原始工作簿
+    workbook = load_workbook(original_file)
+
+    for employee, group in df.groupby(employee_column):
+        employee_name = group[name_column].iloc[0]
+        sheet_name = f'{employee}_{employee_name}'
+
+        # 如果工作表已存在，則刪除它
+        if sheet_name in workbook.sheetnames:
+            del workbook[sheet_name]
+
+        # 創建新的工作表
+        worksheet = workbook.create_sheet(sheet_name)
+
+        # 創建固定的行內容
+        fixed_rows = [
+            ['企業會員乘車服務電子對帳單'],
+            ['客戶名稱：', '', '友訊科技股份有限公司'],
+            ['列帳期間：', '', billing_period],
+        ]
+
+        # 將固定行內容寫入工作表
+        for row in fixed_rows:
+            worksheet.append(row)
+
+        # 重置 group 的索引並保留原始列名
+        group_reset = group.reset_index(drop=True)
+
+        # 將員工數據（包括標題行）寫入工作表
+        worksheet.append(group_reset.columns.tolist())
+        for _, row in group_reset.iterrows():
+            worksheet.append(row.tolist())
+
+        # 計算統計數據
+        total_count = len(group_reset)
+        total_amount = group_reset['折扣後車資'].sum() if '折扣後車資' in group_reset.columns else 0
+
+        # 創建統計數據行
+        stats_rows = [
+            ['總筆數', total_count, '', '', '', '', '折扣後：', total_amount],
+            [],
+            ['*車資總計(運送服務費)：', '', '', '', '', '', f"{total_amount}元"],
+            ['乘車券印製費：', '', '', '', '', '', '0元'],
+            ['滯納金：', '', '', '', '', '', '0元'],
+            ['其它費用：', '', '', '', '', '', '0元'],
+            ['本期應繳帳款：', '', '', '', '', '', f"{total_amount}元"],
+            ['特殊費用：', '', '', '', '', '', '0元'],
+        ]
+
+        # 寫入統計數據行
+        for row in stats_rows:
+            worksheet.append(row)
+
+        # 設置字體大小和調整列寬
+        for row in worksheet.iter_rows():
+            for cell in row:
+                cell.font = Font(size=12)
+
+        for idx, column in enumerate(group_reset.columns):
+            column_letter = get_column_letter(idx + 1)
+            if column in ['上車地點', '下車地點']:
+                worksheet.column_dimensions[column_letter].width = 12
+            else:
+                max_length = max(
+                    group_reset[column].astype(str).map(len).max() + 4, len(str(column)) + 6
+                )
+                worksheet.column_dimensions[column_letter].width = max_length
+
+        # 合併第一行單元格並置中
+        max_col = len(group_reset.columns)
+        worksheet.merge_cells(f'A1:{get_column_letter(max_col)}1')
+        title_cell = worksheet['A1']
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+        worksheet.merge_cells(f'C2:{get_column_letter(max_col)}2')
+        worksheet.merge_cells(f'C3:{get_column_letter(max_col)}3')
+
+        # 設置第一行為粗體
+        bold_font = Font(size=12, bold=True)
+        title_cell.font = bold_font
+        start_row = len(fixed_rows) + len(group_reset) + 2
+        total_count_cell = worksheet.cell(row=start_row, column=1)
+        total_count_cell.font = bold_font
+        total_count_cell = worksheet.cell(row=start_row, column=2)
+        total_count_cell.font = bold_font
+        total_amount_cell = worksheet.cell(row=start_row, column=7)
+        total_amount_cell.font = bold_font
+        total_amount_cell = worksheet.cell(row=start_row, column=8)
+        total_amount_cell.font = bold_font
+        payable_amount_cell = worksheet.cell(row=start_row + 6, column=1)
+        payable_amount_cell.font = bold_font
+        payable_amount_value_cell = worksheet.cell(row=start_row + 6, column=7)
+        payable_amount_value_cell.font = bold_font
+
+        # 添加外框線
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin'),
+        )
+
+        # 為數據部分添加全部框線
+        for row in worksheet[f'A1':f'{get_column_letter(max_col)}{worksheet.max_row}']:
+            for cell in row:
+                cell.border = thin_border
+
+    # 將修改後的工作簿保存到內存中
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        for employee, group in df.groupby(employee_column):
-            employee_name = group[name_column].iloc[0]
-            sheet_name = f'{employee}_{employee_name}'
-
-            # 創建固定的行內容
-            fixed_rows = pd.DataFrame(
-                [
-                    ['企業會員乘車服務電子對帳單'],
-                    ['客戶名稱：', '', '友訊科技股份有限公司'],
-                    ['列帳期間：', '', billing_period],
-                ]
-            )
-
-            # 將固定行內容寫入工作表
-            fixed_rows.to_excel(writer, sheet_name=sheet_name, index=False, header=False)
-
-            # 獲取最後一行的行號
-            last_row = writer.sheets[sheet_name].max_row
-
-            # 重置 group 的索引並保留原始列名
-            group_reset = group.reset_index(drop=True)
-
-            # 將員工數據（包括標題行）寫入工作表
-            group_reset.to_excel(writer, sheet_name=sheet_name, startrow=last_row, index=False)
-
-            # 計算統計數據
-            total_count = len(group_reset)
-            total_amount = (
-                group_reset['折扣後車資'].sum() if '折扣後車資' in group_reset.columns else 0
-            )
-
-            # 創建統計數據行
-            stats_rows = pd.DataFrame(
-                [
-                    ['總筆數', total_count, '', '', '', '', '折扣後：', total_amount],
-                    [],
-                    ['*車資總計(運送服務費)：', '', '', '', '', '', f"{total_amount}元"],
-                    ['乘車券印製費：', '', '', '', '', '', '0元'],
-                    ['滯納金：', '', '', '', '', '', '0元'],
-                    ['其它費用：', '', '', '', '', '', '0元'],
-                    ['本期應繳帳款：', '', '', '', '', '', f"{total_amount}元"],
-                    ['特殊費用：', '', '', '', '', '', '0元'],
-                ]
-            )
-
-            stats_start_row = last_row + len(group_reset) + 1
-            stats_rows.to_excel(
-                writer, sheet_name=sheet_name, startrow=stats_start_row, index=False, header=False
-            )
-
-            # 設置字體大小和調整列寬
-            worksheet = writer.sheets[sheet_name]
-            for row in worksheet.iter_rows():
-                for cell in row:
-                    cell.font = Font(size=12)
-
-            for idx, column in enumerate(group_reset.columns):
-                column_letter = get_column_letter(idx + 1)
-                if column in ['上車地點', '下車地點']:
-                    worksheet.column_dimensions[column_letter].width = 12
-                else:
-                    max_length = max(
-                        group_reset[column].astype(str).map(len).max() + 4, len(str(column)) + 8
-                    )
-                    worksheet.column_dimensions[column_letter].width = max_length
-
-            # 合併第一行單元格並置中
-            max_col = len(group_reset.columns)
-            worksheet.merge_cells(f'A1:{get_column_letter(max_col)}1')
-            title_cell = worksheet['A1']
-            title_cell.alignment = Alignment(horizontal='center', vertical='center')
-            worksheet.merge_cells(f'C2:{get_column_letter(max_col)}2')
-            worksheet.merge_cells(f'C3:{get_column_letter(max_col)}3')
-
-            # 設置第一行為粗體
-            bold_font = Font(size=12, bold=True)
-            title_cell.font = bold_font
-            total_count_cell = worksheet.cell(row=stats_start_row + 1, column=1)
-            total_count_cell.font = bold_font
-            total_count_cell = worksheet.cell(row=stats_start_row + 1, column=2)
-            total_count_cell.font = bold_font
-            total_amount_cell = worksheet.cell(row=stats_start_row + 1, column=7)
-            total_amount_cell.font = bold_font
-            total_amount_cell = worksheet.cell(row=stats_start_row + 1, column=8)
-            total_amount_cell.font = bold_font
-            payable_amount_cell = worksheet.cell(row=stats_start_row + 7, column=1)
-            payable_amount_cell.font = bold_font
-            payable_amount_value_cell = worksheet.cell(row=stats_start_row + 7, column=7)
-            payable_amount_value_cell.font = bold_font
-
-            # 添加外框線
-            thin_border = Border(
-                left=Side(style='thin'),
-                right=Side(style='thin'),
-                top=Side(style='thin'),
-                bottom=Side(style='thin'),
-            )
-
-            # 為數據部分添加全部框線
-            for row in worksheet[f'A1':f'{get_column_letter(max_col)}{worksheet.max_row}']:
-                for cell in row:
-                    cell.border = thin_border
+    workbook.save(output)
+    output.seek(0)
 
     return output
 
@@ -203,8 +210,6 @@ def main():
     if uploaded_file is not None:
         # 獲取上傳文件的原始名稱
         original_filename = uploaded_file.name
-        # 移除文件擴展名
-        filename_without_ext = original_filename.rsplit('.', 1)[0]
 
         # 讀取所有工作表
         xls = pd.ExcelFile(uploaded_file)
@@ -231,14 +236,14 @@ def main():
         display_employee_data(processed_df)
 
         # 創建包含每個員工數據的Excel文件
-        output = create_employee_sheets(processed_df, billing_period)
+        output = create_employee_sheets(processed_df, billing_period, uploaded_file)
 
         if output:
-            # 提供下載按鈕，使用原始文件名加上後綴
+            # 提供下載按鈕，使用原始文件名
             st.download_button(
-                label="下載按員工分類的Excel文件",
+                label="下載修改後的Excel文件",
                 data=output.getvalue(),
-                file_name=f"{filename_without_ext}_員工分類.xlsx",
+                file_name=original_filename.replace('.xlsx', '_更新.xlsx'),
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
