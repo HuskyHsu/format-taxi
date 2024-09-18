@@ -6,6 +6,19 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side
 
+extension = {
+    '08956': '6312',
+    '07030': '6412',
+    '05259': '2340',
+    '06294': '8254',
+    '08332': '6654',
+    '09025': '6716',
+    '09092': '6112',
+    '09137': '6834',
+    '09214': '5738',
+    '09324': '2531',
+}
+
 
 def process_dataframe(df):
     # 找到 "旅次明細表" 所在的行
@@ -214,7 +227,15 @@ def create_employee_sheets(df, billing_period, original_file):
                 cell.border = thin_border
 
         summary_data.append(
-            [len(summary_data) + 1, employee_name, employee, "", total_count, total_amount, ""]
+            [
+                len(summary_data) + 1,
+                employee_name,
+                employee,
+                extension[employee] if employee in extension else "",
+                total_count,
+                total_amount,
+                "",
+            ]
         )
 
     for row in summary_data:
@@ -231,6 +252,17 @@ def create_employee_sheets(df, billing_period, original_file):
         for cell in row:
             cell.font = Font(size=12)
             cell.border = thin_border
+
+    for row in summary_sheet.iter_rows(min_row=1, max_row=3):
+        for col, cell in enumerate(row, start=1):
+            if col == 1:
+                cell.alignment = Alignment(horizontal='right', vertical='center')
+            elif col == 4:
+                cell.alignment = Alignment(horizontal='left', vertical='center')
+
+    for row in summary_sheet.iter_rows(min_row=4):
+        for cell in row:
+            cell.alignment = Alignment(horizontal='center', vertical='center')
 
     # 將修改後的工作簿保存到內存中
     output = io.BytesIO()
