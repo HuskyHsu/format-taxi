@@ -6,18 +6,15 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side
 
-extension = {
-    '08956': '6312',
-    '07030': '6412',
-    '05259': '2340',
-    '06294': '8254',
-    '08332': '6654',
-    '09025': '6716',
-    '09092': '6112',
-    '09137': '6834',
-    '09214': '5738',
-    '09324': '2531',
-}
+
+def parse_extension_input(extension_input):
+    extension = {}
+    for line in extension_input.split('\n'):
+        parts = line.strip().split(':')
+        if len(parts) == 2:
+            employee_id, ext = parts
+            extension[employee_id.strip()] = ext.strip()
+    return extension
 
 
 def process_dataframe(df):
@@ -93,7 +90,7 @@ def display_employee_data(df):
     st.dataframe(employee_data)
 
 
-def create_employee_sheets(df, billing_period, original_file, grouped_employees):
+def create_employee_sheets(df, billing_period, original_file, grouped_employees, extension):
     employee_column = '員工編號'
     name_column = '員工姓名'
 
@@ -243,7 +240,9 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees)
                 len(summary_data) + 1,
                 first_employee_name,
                 first_employee_id,
-                extension[first_employee_id] if first_employee_id in extension else "",
+                extension.get(
+                    first_employee_id, ""
+                ),  # 使用 get 方法，如果没有对应的分机，返回空字符串
                 total_count,
                 total_amount,
                 "",
@@ -364,7 +363,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees)
                 len(summary_data) + 1,
                 employee_name,
                 employee,
-                extension[employee] if employee in extension else "",
+                extension.get(employee, ""),  # 使用 get 方法，如果没有对应的分机，返回空字符串
                 total_count,
                 total_amount,
                 "",
@@ -413,6 +412,14 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees)
     return output
 
 
+def get_all_employee_ids(df):
+    employee_column = '員工編號'
+    if employee_column not in df.columns:
+        st.error(f"找不到 '{employee_column}' 列。請確保數據中包含此列。")
+        return []
+    return sorted(df[employee_column].unique().tolist())
+
+
 def main():
     st.title("Excel數據整理工具")
 
@@ -447,6 +454,33 @@ def main():
         # 顯示每個員工的數據
         display_employee_data(processed_df)
 
+        # 获取所有员工编号
+        all_employee_ids = get_all_employee_ids(processed_df)
+
+        # 添加输入框让用户输入员工编号和分机的对应关系
+        default_extension_input = "08956: 6312\n07030: 6412\n05259: 2340\n06294: 8254\n08332: 6654\n09025: 6716\n09092: 6112\n09137: 6834\n09214: 5738\n09324: 2531"
+        extension_input = st.text_area(
+            "請輸入員工編號和分機的對應關係（每行一個，格式為 '員工編號: 分機'）",
+            default_extension_input,
+        )
+
+        # 解析用户输入的分机对应关系
+        extension = parse_extension_input(extension_input)
+
+        # 找出缺漏的员工编号
+        missing_ids = [emp_id for emp_id in all_employee_ids if emp_id not in extension]
+
+        # 如果有缺漏的员工编号，更新输入框
+        if missing_ids:
+            missing_input = "\n".join([f"{emp_id}: " for emp_id in missing_ids])
+            updated_extension_input = missing_input + "\n" + extension_input
+            st.warning(f"以下員工編號缺少分機對應關係：{', '.join(missing_ids)}")
+            extension_input = st.text_area(
+                "更新後的員工編號和分機對應關係（請為缺漏的編號添加分機）",
+                updated_extension_input,
+            )
+            extension = parse_extension_input(extension_input)
+
         # 添加输入框让用户输入要分组的员工编号
         grouped_employees_input = st.text_area(
             "請輸入要一起分組的員工編號（每組一行，用逗號分隔）",
@@ -462,7 +496,7 @@ def main():
 
         # 创建包含每个员工数据的Excel文件
         output = create_employee_sheets(
-            processed_df, billing_period, uploaded_file, grouped_employees
+            processed_df, billing_period, uploaded_file, grouped_employees, extension
         )
 
         if output:
