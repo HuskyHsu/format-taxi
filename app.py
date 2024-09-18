@@ -1,6 +1,7 @@
+from datetime import datetime
+import io
 import streamlit as st
 import pandas as pd
-import io
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side
@@ -70,7 +71,7 @@ def display_employee_data(df):
     # 創建一個選擇框讓用戶選擇要查看的員工
     selected_employee = st.selectbox("選擇員工", employee_options)
 
-    # 從選擇的選項中提取員工編號
+    # 從選擇的選項中提���員工編號
     selected_employee_id = selected_employee.split(' - ')[0]
 
     # 顯示選中員工的數據
@@ -90,9 +91,28 @@ def create_employee_sheets(df, billing_period, original_file):
     # 加載原始工作簿
     workbook = load_workbook(original_file)
 
+    summary_sheet = workbook.create_sheet("總表")
+    current_date = datetime.now()
+    current_year_month = current_date.strftime("%Y/%m")
+    today = current_date.strftime("%Y/%m/%d")
+    fixed_rows = [
+        ['台灣大車隊乘車費總表', '', '', current_year_month],
+        ['列帳期間：', '', '', billing_period],
+        ['收據日期', '', '', today],
+    ]
+
+    for i, row in enumerate(fixed_rows):
+        summary_sheet.append(row)
+        summary_sheet.merge_cells(f'A{i+1}:C{i+1}')
+        summary_sheet.merge_cells(f'D{i+1}:G{i+1}')
+
+    summary_sheet.append(["NO", "員工姓名", "工號", "聯絡電話", "筆數", "折扣後車資", "ACK"])
+
+    summary_data = []
+
     for employee, group in df.groupby(employee_column):
         employee_name = group[name_column].iloc[0]
-        sheet_name = f'{employee}_{employee_name}'
+        sheet_name = f'{employee} {employee_name}'
 
         # 如果工作表已存在，則刪除它
         if sheet_name in workbook.sheetnames:
@@ -192,6 +212,25 @@ def create_employee_sheets(df, billing_period, original_file):
         for row in worksheet[f'A1':f'{get_column_letter(max_col)}{worksheet.max_row}']:
             for cell in row:
                 cell.border = thin_border
+
+        summary_data.append(
+            [len(summary_data) + 1, employee_name, employee, "", total_count, total_amount, ""]
+        )
+
+    for row in summary_data:
+        summary_sheet.append(row)
+
+    total_count = sum(row[4] for row in summary_data)
+    total_amount = sum(row[5] for row in summary_data)
+    summary_sheet.append(["合計", "", "", "", total_count, total_amount, ""])
+    summary_sheet.merge_cells(f"A{len(summary_data) + 5}:D{len(summary_data) + 5}")
+
+    for row in summary_sheet.iter_rows(
+        min_row=1, max_row=len(summary_data) + 5, min_col=1, max_col=7
+    ):
+        for cell in row:
+            cell.font = Font(size=12)
+            cell.border = thin_border
 
     # 將修改後的工作簿保存到內存中
     output = io.BytesIO()
