@@ -6,6 +6,12 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, Border, Side
 
+st.set_page_config(
+    page_title="台灣大車隊報表整理 App",
+    page_icon="🍁",
+    layout="wide",
+)
+
 
 def parse_extension_input(extension_input):
     extension = {}
