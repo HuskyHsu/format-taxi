@@ -120,27 +120,35 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
 
     summary_data = []
 
-    # 创建一个反向映射，用于快速查找员工所属的组
-    employee_to_group = {}
-    for group, employees in grouped_employees.items():
-        for employee in employees:
-            employee_to_group[employee] = group
-
-    # 按组处理数据
+    # 處理分組的員工
     for group, employees in grouped_employees.items():
         if not employees:
             continue
 
-        # 使用输入中的第一个员工作为代表
-        first_employee_id = employees[0]
         group_df = df[df[employee_column].isin(employees)]
 
         if group_df.empty:
             continue
 
-        # 获取第一个员工的信息
-        first_employee = group_df[group_df[employee_column] == first_employee_id].iloc[0]
+        total_count = len(group_df)
+        total_amount = group_df['折扣後車資'].sum() if '折扣後車資' in group_df.columns else 0
+
+        # 使用組內第一個員工的資訊作為代表
+        first_employee = group_df.iloc[0]
+        first_employee_id = first_employee[employee_column]
         first_employee_name = first_employee[name_column]
+
+        summary_data.append(
+            [
+                len(summary_data) + 1,
+                first_employee_name,
+                first_employee_id,
+                extension.get(first_employee_id, ""),
+                total_count,
+                total_amount,
+                "",
+            ]
+        )
 
         sheet_name = f'{first_employee_id} {first_employee_name}'
         worksheet = workbook.create_sheet(sheet_name)
@@ -234,29 +242,30 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
             for cell in row:
                 cell.border = thin_border
 
-        # 更新summary_data，使用第一个员工的信息
+    # 處理未分組的員工
+    ungrouped_employees = set(df[employee_column]) - set(
+        employee for group in grouped_employees.values() for employee in group
+    )
+    for employee in ungrouped_employees:
+        employee_df = df[df[employee_column] == employee]
+        employee_name = employee_df[name_column].iloc[0]
+
+        total_count = len(employee_df)
+        total_amount = employee_df['折扣後車資'].sum() if '折扣後車資' in employee_df.columns else 0
+
         summary_data.append(
             [
                 len(summary_data) + 1,
-                first_employee_name,
-                first_employee_id,
-                extension.get(
-                    first_employee_id, ""
-                ),  # 使用 get 方法，如果没有对应的分机，返回空字符串
+                employee_name,
+                employee,
+                extension.get(employee, ""),
                 total_count,
                 total_amount,
                 "",
             ]
         )
 
-    # 处理未分组的员工
-    ungrouped_employees = set(df[employee_column]) - set(employee_to_group.keys())
-    for employee in ungrouped_employees:
-        employee_df = df[df[employee_column] == employee]
-        employee_name = employee_df[name_column].iloc[0]
         sheet_name = f'{employee} {employee_name}'
-
-        # 创建新的工作表
         worksheet = workbook.create_sheet(sheet_name)
 
         # 创建固定的行内容
@@ -355,23 +364,12 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
             for cell in row:
                 cell.border = thin_border
 
-        # 更新summary_data
-        total_count = len(employee_df)
-        total_amount = employee_df['折扣後車資'].sum() if '折扣後車資' in employee_df.columns else 0
-        summary_data.append(
-            [
-                len(summary_data) + 1,
-                employee_name,
-                employee,
-                extension.get(employee, ""),  # 使用 get 方法，如果没有对应的分机，返回空字符串
-                total_count,
-                total_amount,
-                "",
-            ]
-        )
+    # 根據員工編號排序 summary_data
+    summary_data.sort(key=lambda x: x[2])  # x[2] 是員工編號
 
-    # 将summary_data写入总表
-    for row in summary_data:
+    # 將排序後的 summary_data 寫入總表
+    for i, row in enumerate(summary_data, start=1):
+        row[0] = i  # 更新序號
         summary_sheet.append(row)
 
     # 计算总计
@@ -404,7 +402,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         for cell in row:
             cell.alignment = Alignment(horizontal='center', vertical='center')
 
-    # 将修改后的工作簿保存到内存中
+    # 将修改后的工作保存到内存中
     output = io.BytesIO()
     workbook.save(output)
     output.seek(0)
@@ -484,17 +482,18 @@ def main():
         # 添加输入框让用户输入要分组的员工编号
         grouped_employees_input = st.text_area(
             "請輸入要一起分組的員工編號（每組一行，用逗號分隔）",
-            "09021,07030,07468,09335\n06294,08332,09025",
+            "",
         )
 
-        # 处理用户输入的分组信息
+        # 處理用戶輸入的分組信息
         grouped_employees = {}
-        for i, group in enumerate(grouped_employees_input.split('\n')):
-            employees = [emp.strip() for emp in group.split(',') if emp.strip()]
-            if employees:
-                grouped_employees[f'Group_{i+1}'] = employees
+        if grouped_employees_input.strip():  # 只有當輸入不為空時才處理
+            for i, group in enumerate(grouped_employees_input.split('\n')):
+                employees = [emp.strip() for emp in group.split(',') if emp.strip()]
+                if employees:
+                    grouped_employees[f'Group_{i+1}'] = employees
 
-        # 创建包含每个员工数据的Excel文件
+        # 創建包含每個員工數據的Excel文件
         output = create_employee_sheets(
             processed_df, billing_period, uploaded_file, grouped_employees, extension
         )
