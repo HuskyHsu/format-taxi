@@ -125,21 +125,19 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         if not employees:
             continue
 
-        # 根據員工編號排序組內的員工
-        sorted_employees = sorted(employees)
-
-        group_df = df[df[employee_column].isin(sorted_employees)]
+        # 使用 grouped_employees 中的第一個員工編號作為代表
+        first_employee_id = employees[0]
+        group_df = df[df[employee_column].isin(employees)]
 
         if group_df.empty:
             continue
 
+        # 獲取第一個員工的資訊
+        first_employee_data = group_df[group_df[employee_column] == first_employee_id].iloc[0]
+        first_employee_name = first_employee_data[name_column]
+
         total_count = len(group_df)
         total_amount = group_df['折扣後車資'].sum() if '折扣後車資' in group_df.columns else 0
-
-        # 使用組內第一個員工的資訊作為代表
-        first_employee = group_df.iloc[0]
-        first_employee_id = first_employee[employee_column]
-        first_employee_name = first_employee[name_column]
 
         summary_data.append(
             [
@@ -474,7 +472,7 @@ def main():
         all_employee_ids = get_all_employee_ids(processed_df)
 
         # 添加输入框让用户输入员工编号和分机的对应关系
-        default_extension_input = "08956: 6312\n07030: 6412\n05259: 2340\n06294: 8254\n08332: 6654\n09025: 6716\n09092: 6112\n09137: 6834\n09214: 5738\n09324: 2531"
+        default_extension_input = "08956: 6312\n07030: 6412\n05259: 2340\n06294: 8254\n08332: 6654\n09025: 6716\n09092: 6112\n09137: 6834\n09214: 5738\n09324: 2531\n07468: 6417\n08951: 6300\n09021: 6413\n09335: 6416"
         extension_input = st.text_area(
             "請輸入員工編號和分機的對應關係（每行一個，格式為 '員工編號: 分機'）",
             default_extension_input,
