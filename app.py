@@ -125,7 +125,10 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         if not employees:
             continue
 
-        group_df = df[df[employee_column].isin(employees)]
+        # 根據員工編號排序組內的員工
+        sorted_employees = sorted(employees)
+
+        group_df = df[df[employee_column].isin(sorted_employees)]
 
         if group_df.empty:
             continue
@@ -164,14 +167,17 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         for row in fixed_rows:
             worksheet.append(row)
 
-        # 将组内所有员工的数据写入工作表
-        worksheet.append(group_df.columns.tolist())
-        for _, row in group_df.iterrows():
+        # 將組內所有員工的數據寫入工作表，按照員工編號排序
+        sorted_group_df = group_df.sort_values(by=employee_column)
+        worksheet.append(sorted_group_df.columns.tolist())
+        for _, row in sorted_group_df.iterrows():
             worksheet.append(row.tolist())
 
         # 计算统计数据
-        total_count = len(group_df)
-        total_amount = group_df['折扣後車資'].sum() if '折扣後車資' in group_df.columns else 0
+        total_count = len(sorted_group_df)
+        total_amount = (
+            sorted_group_df['折扣後車資'].sum() if '折扣後車資' in sorted_group_df.columns else 0
+        )
 
         # 创建统计数据行
         stats_rows = [
@@ -194,18 +200,18 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
             for cell in row:
                 cell.font = Font(size=12)
 
-        for idx, column in enumerate(group_df.columns):
+        for idx, column in enumerate(sorted_group_df.columns):
             column_letter = get_column_letter(idx + 1)
             if column in ['上車地點', '下車地點']:
                 worksheet.column_dimensions[column_letter].width = 12
             else:
                 max_length = max(
-                    group_df[column].astype(str).map(len).max() + 4, len(str(column)) + 6
+                    sorted_group_df[column].astype(str).map(len).max() + 4, len(str(column)) + 6
                 )
                 worksheet.column_dimensions[column_letter].width = max_length
 
         # 合併第一行單元格並置中
-        max_col = len(group_df.columns)
+        max_col = len(sorted_group_df.columns)
         worksheet.merge_cells(f'A1:{get_column_letter(max_col)}1')
         title_cell = worksheet['A1']
         title_cell.alignment = Alignment(horizontal='center', vertical='center')
@@ -215,7 +221,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         # 设第一行为粗体
         bold_font = Font(size=12, bold=True)
         title_cell.font = bold_font
-        start_row = len(fixed_rows) + len(group_df) + 2
+        start_row = len(fixed_rows) + len(sorted_group_df) + 2
         total_count_cell = worksheet.cell(row=start_row, column=1)
         total_count_cell.font = bold_font
         total_count_cell = worksheet.cell(row=start_row, column=2)
