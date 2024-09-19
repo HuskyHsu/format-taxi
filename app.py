@@ -212,7 +212,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         worksheet.merge_cells(f'C2:{get_column_letter(max_col)}2')
         worksheet.merge_cells(f'C3:{get_column_letter(max_col)}3')
 
-        # 设置第一行为粗体
+        # 设第一行为粗体
         bold_font = Font(size=12, bold=True)
         title_cell.font = bold_font
         start_row = len(fixed_rows) + len(group_df) + 2
@@ -282,7 +282,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         # 重置 employee_df 的索引并保留原始列名
         employee_df_reset = employee_df.reset_index(drop=True)
 
-        # 将员工数据（包括标题行）写入工作表
+        # 将员工数据包括标题）写入工作表
         worksheet.append(employee_df_reset.columns.tolist())
         for _, row in employee_df_reset.iterrows():
             worksheet.append(row.tolist())
@@ -401,6 +401,18 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
     for row in summary_sheet.iter_rows(min_row=4):
         for cell in row:
             cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    # 在處理完所有工作表後，重新排序
+    sheets = workbook.sheetnames
+    # 只對員工工作表進行排序，保留前兩個工作表不變
+    employee_sheets = sheets[2:]
+
+    # 根據工作表名稱（員工編號）進行排序
+    sorted_sheets = sorted(employee_sheets, key=lambda x: x.split()[0])
+
+    # 重新排列工作表
+    for i, sheet_name in enumerate(sorted_sheets, start=2):
+        workbook.move_sheet(sheet_name, offset=i - workbook.index(workbook[sheet_name]))
 
     # 将修改后的工作保存到内存中
     output = io.BytesIO()
