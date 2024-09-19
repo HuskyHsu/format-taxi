@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import io
 import streamlit as st
 import pandas as pd
@@ -108,9 +108,12 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
     workbook = load_workbook(original_file)
 
     summary_sheet = workbook.create_sheet("總表")
-    current_date = datetime.now()
-    current_year_month = current_date.strftime("%Y/%m")
-    today = current_date.strftime("%Y/%m/%d")
+    end_date_str = billing_period.split('~')[1].strip()
+    end_date = datetime.strptime(end_date_str, "%Y 年 %m 月 %d 日")
+
+    current_year_month = end_date.strftime("%Y/%m")
+    today = (end_date + timedelta(days=1)).strftime("%Y/%m/%d")
+
     fixed_rows = [
         ['台灣大車隊乘車費總表', '', '', current_year_month],
         ['列帳期間：', '', '', billing_period],
