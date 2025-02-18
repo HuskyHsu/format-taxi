@@ -80,9 +80,7 @@ def display_employee_data(df):
     employees = df[[employee_column, name_column]].drop_duplicates()
 
     # 創建一個包含員工編號和姓名的選項列表
-    employee_options = [
-        f"{row[employee_column]} - {row[name_column]}" for _, row in employees.iterrows()
-    ]
+    employee_options = [f"{row[employee_column]} - {row[name_column]}" for _, row in employees.iterrows()]
 
     # 創建一個選擇框讓用戶選擇要查看的員工
     selected_employee = st.selectbox("選擇員工", employee_options)
@@ -182,9 +180,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
 
         # 计算统计数据
         total_count = len(sorted_group_df)
-        total_amount = (
-            sorted_group_df['折扣後車資'].sum() if '折扣後車資' in sorted_group_df.columns else 0
-        )
+        total_amount = sorted_group_df['折扣後車資'].sum() if '折扣後車資' in sorted_group_df.columns else 0
 
         # 创建统计数据行
         stats_rows = [
@@ -212,9 +208,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
             if column in ['上車地點', '下車地點']:
                 worksheet.column_dimensions[column_letter].width = 12
             else:
-                max_length = max(
-                    sorted_group_df[column].astype(str).map(len).max() + 4, len(str(column)) + 6
-                )
+                max_length = max(sorted_group_df[column].astype(str).map(len).max() + 4, len(str(column)) + 6)
                 worksheet.column_dimensions[column_letter].width = max_length
 
         # 合併第一行單元格並置中
@@ -251,14 +245,12 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         )
 
         # 为数据部分添加全部框线
-        for row in worksheet[f'A1':f'{get_column_letter(max_col)}{worksheet.max_row}']:
+        for row in worksheet[f'A1' :f'{get_column_letter(max_col)}{worksheet.max_row}']:
             for cell in row:
                 cell.border = thin_border
 
     # 處理未分組的員工
-    ungrouped_employees = set(df[employee_column]) - set(
-        employee for group in grouped_employees.values() for employee in group
-    )
+    ungrouped_employees = set(df[employee_column]) - set(employee for group in grouped_employees.values() for employee in group)
     for employee in ungrouped_employees:
         employee_df = df[df[employee_column] == employee]
         employee_name = employee_df[name_column].iloc[0]
@@ -302,11 +294,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
 
         # 计算统计数据
         total_count = len(employee_df_reset)
-        total_amount = (
-            employee_df_reset['折扣後車資'].sum()
-            if '折扣後車資' in employee_df_reset.columns
-            else 0
-        )
+        total_amount = employee_df_reset['折扣後車資'].sum() if '折扣後車資' in employee_df_reset.columns else 0
 
         # 创建统计数据行
         stats_rows = [
@@ -334,9 +322,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
             if column in ['上車地點', '下車地點']:
                 worksheet.column_dimensions[column_letter].width = 12
             else:
-                max_length = max(
-                    employee_df_reset[column].astype(str).map(len).max() + 4, len(str(column)) + 6
-                )
+                max_length = max(employee_df_reset[column].astype(str).map(len).max() + 4, len(str(column)) + 6)
                 worksheet.column_dimensions[column_letter].width = max_length
 
         # 合併第一行單元格並置中
@@ -373,7 +359,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         )
 
         # 为数据部分添加全部框线
-        for row in worksheet[f'A1':f'{get_column_letter(max_col)}{worksheet.max_row}']:
+        for row in worksheet[f'A1' :f'{get_column_letter(max_col)}{worksheet.max_row}']:
             for cell in row:
                 cell.border = thin_border
 
@@ -392,9 +378,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
     summary_sheet.merge_cells(f"A{len(summary_data) + 5}:D{len(summary_data) + 5}")
 
     # 设置总表格式
-    for row in summary_sheet.iter_rows(
-        min_row=1, max_row=len(summary_data) + 5, min_col=1, max_col=7
-    ):
+    for row in summary_sheet.iter_rows(min_row=1, max_row=len(summary_data) + 5, min_col=1, max_col=7):
         for cell in row:
             cell.font = Font(size=12)
             cell.border = Border(
@@ -444,7 +428,7 @@ def get_all_employee_ids(df):
 
 
 def main():
-    st.title("Excel數據整理工具")
+    st.title("Excel數據整理工具(2025-02)")
 
     # 上传Excel文件
     uploaded_file = st.file_uploader("請上傳Excel文件", type=["xlsx", "xls"])
@@ -481,7 +465,7 @@ def main():
         all_employee_ids = get_all_employee_ids(processed_df)
 
         # 添加输入框让用户输入员工编号和分机的对应关系
-        default_extension_input = "08956: 6312\n07030: 6412\n05259: 2340\n06294: 8254\n08332: 6654\n09025: 6716\n09092: 6112\n09137: 6834\n09214: 5738\n09324: 2531\n07468: 6417\n08951: 6300\n09021: 6413\n09335: 6416"
+        default_extension_input = "08956: 6312\n07030: 6412\n05259: 2340\n06294: 8254\n08332: 6654\n09025: 6716\n09092: 6112\n09137: 6834\n09214: 5738\n09324: 2531\n07468: 6417\n08951: 6300\n09021: 6413\n09335: 6416\n02345: 2257\n04655: 6714\n05838: 6762\n05870: 8238\n06076: 5719\n07010: 5736\n07577: 5665\n07743: 5258\n08896: 3488\n08942: 2378\n09187: 1\n09343: 6663\n09356: 6438\n09384: 6115"
         extension_input = st.text_area(
             "請輸入員工編號和分機的對應關係（每行一個，格式為 '員工編號: 分機'）",
             default_extension_input,
@@ -519,9 +503,7 @@ def main():
                     grouped_employees[f'Group_{i+1}'] = employees
 
         # 創建包含每個員工數據的Excel文件
-        output = create_employee_sheets(
-            processed_df, billing_period, uploaded_file, grouped_employees, extension
-        )
+        output = create_employee_sheets(processed_df, billing_period, uploaded_file, grouped_employees, extension)
 
         if output:
             # 提供下载按钮，使用原始文件名
