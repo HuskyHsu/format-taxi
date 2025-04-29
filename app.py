@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import io
+import re
 import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
@@ -159,6 +160,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         )
 
         sheet_name = f'{first_employee_id} {first_employee_name}'
+        sheet_name = re.sub(r'[\\/*?:\[\]]', '', sheet_name)
         worksheet = workbook.create_sheet(sheet_name)
 
         # 创建固定的行内容
@@ -271,6 +273,7 @@ def create_employee_sheets(df, billing_period, original_file, grouped_employees,
         )
 
         sheet_name = f'{employee} {employee_name}'
+        sheet_name = re.sub(r'[\\/*?:\[\]]', '', sheet_name)
         worksheet = workbook.create_sheet(sheet_name)
 
         # 创建固定的行内容
@@ -428,7 +431,7 @@ def get_all_employee_ids(df):
 
 
 def main():
-    st.title("Excel數據整理工具(2025-02)")
+    st.title("Excel數據整理工具(2025-04)")
 
     # 上传Excel文件
     uploaded_file = st.file_uploader("請上傳Excel文件", type=["xlsx", "xls"])
